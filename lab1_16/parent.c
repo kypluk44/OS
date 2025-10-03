@@ -5,7 +5,7 @@
 #include <sys/types.h> //_t
 #include <sys/wait.h> //wait
 
-#define BUFSZ 256
+#define BUFSIZE 256
 
 int main(void) {
     int pipe1[2], pipe2[2];
@@ -28,8 +28,14 @@ int main(void) {
         close(pipe2[0]);
 
         //переназначение стандартных потоков
-        dup2(pipe1[0], STDIN_FILENO); //stdin ребёнка читается из pipe1
-        dup2(pipe2[1], STDOUT_FILENO); //stdout ребёнка записывает в pipe2
+        if (dup2(pipe1[0], STDIN_FILENO) == -1){
+            perror("dup2");
+            exit(EXIT_FAILURE);
+        }; //stdin ребёнка читается из pipe1
+        if (dup2(pipe2[1], STDOUT_FILENO) == -1){
+            perror("dup2");
+            exit(EXIT_FAILURE);
+        }; //stdout ребёнка записывает в pipe2
 
         //закрытие
         close(pipe1[0]);
@@ -44,9 +50,9 @@ int main(void) {
         close(pipe1[0]);
         close(pipe2[1]);
         
-        char buffer[BUFSZ];
-        char errbuf[BUFSZ];
-        size_t r;
+        char buffer[BUFSIZE];
+        char errbuf[BUFSIZE];
+        ssize_t r;
 
         printf("Введите имя файла: ");
         if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
@@ -55,18 +61,30 @@ int main(void) {
         }
         buffer[strcspn(buffer, "\n")] = '\0';
 
-        write(pipe1[1], buffer, strlen(buffer));
-        write(pipe1[1], "\n", 1);
+        if (write(pipe1[1], buffer, strlen(buffer)) != (ssize_t)strlen(buffer)){
+            perror("write");
+            exit(EXIT_FAILURE);
+        };
+        if (write(pipe1[1], "\n", 1) != 1){
+            perror("write");
+            exit(EXIT_FAILURE);
+        };
 
         while (1) {
             printf("Введите строку (пустая строка/Ctrl+D для выхода): ");
-            if (fgets(buffer, BUFSZ, stdin) == NULL) break; //ctrl+D == null
+            if (fgets(buffer, BUFSIZE, stdin) == NULL) break; //ctrl+D == null
             buffer[strcspn(buffer, "\n")] = '\0';
 
             if (strlen(buffer) == 0) break; //enter == null
 
-            write(pipe1[1], buffer, strlen(buffer));
-            write(pipe1[1], "\n", 1);
+            if (write(pipe1[1], buffer, strlen(buffer)) != (ssize_t)strlen(buffer)){
+                perror("write");
+                exit(EXIT_FAILURE);
+            };
+            if (write(pipe1[1], "\n", 1) != 1){
+                perror("write");
+                exit(EXIT_FAILURE);
+            };
         }
 
         close(pipe1[1]); //eof ребенку
